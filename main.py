@@ -85,20 +85,21 @@ app.include_router(router, prefix='')
 @app.post('/signup', tags=['Authentication'])
 def signup(user: UserRegistration, db: Session = Depends(get_db)):
     """Signup endpoint"""
+    username_exists = db.query(models.User).filter(
+        func.lower(models.User.username) == func.lower(user.username)).first()
+    if username_exists:
+        raise HTTPException(status_code=409,
+                            detail='This username already taken')
+
     email_exists = db.query(models.User).filter(
         func.lower(models.User.email) == func.lower(user.email)).first()
     if email_exists:
-        raise HTTPException(status_code=400,
+        raise HTTPException(status_code=409,
                             detail='This email is already taken')
 
     email_is_verified = verify_email(user.email)
     if not email_is_verified:
         raise HTTPException(status_code=400, detail='Invalid email address')
-
-    for db_user in db:
-        if db_user.username == user.username:
-            raise HTTPException(status_code=400,
-                                detail='Username already taken')
 
     hashed_password = hash_password(user.password)
     user.password = hashed_password
@@ -134,9 +135,32 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(),
 
 @app.get('/posts', tags=['Posts'])
 def get_posts(db: Session = Depends(get_db)):
-    """Get list of all posts"""
-    posts = db.query(models.Post).all()
-    return posts
+    """Get list of all posts with reaction counts"""
+    posts_with_reactions = (
+        db.query(
+            models.Post,
+            func.sum(func.cast(
+                models.PostReaction.is_positive,
+                models.Integer)).label('likes_count'),
+            func.sum(func.cast(
+                ~models.PostReaction.is_positive,
+                models.Integer)).label('dislikes_count')
+        )
+        .outerjoin(models.Post.reactions)
+        .group_by(models.Post.id)
+        .all()
+    )
+
+    posts_with_counts = [
+        {
+            'post': post,
+            'likes_count': likes_count or 0,
+            'dislikes_count': dislikes_count or 0
+        }
+        for post, likes_count, dislikes_count in posts_with_reactions
+    ]
+
+    return posts_with_counts
 
 
 @app.post('/posts', tags=['Posts'])
@@ -147,9 +171,10 @@ def create_post(
 ):
     """Endpoint for creating posts for authorized users"""
     new_post = models.Post(
-        author=user.username,
+        author_id=user.id,
         title=post.title,
-        content=post.content
+        content=post.content,
+        reactions=[]
     )
     db.add(new_post)
     db.commit()
@@ -166,17 +191,20 @@ def update_post(
     """Endpoint to update post's fields"""
     post_to_update = db.query(models.Post).filter(
         models.Post.id == post_id,
-        models.Post.author == user.username
     ).first()
 
-    if post_to_update:
-        for field, value in post.dict(exclude_unset=True).items():
-            setattr(post_to_update, field, value)
-        db.commit()
-        return {'message': 'Post updated'}
+    if not post_to_update:
+        raise HTTPException(status_code=404,
+                            detail='Post not found or user unauthorized')
 
-    raise HTTPException(status_code=404,
-                        detail='Post not found or user unauthorized')
+    if post_to_update.author_id == user.id:
+        raise HTTPException(status_code=403,
+                            detail='User not authorized to update this post')
+
+    for field, value in post.dict(exclude_unset=True).items():
+        setattr(post_to_update, field, value)
+    db.commit()
+    return {'message': 'Post updated'}
 
 
 @app.delete('/posts/{post_id}', tags=['Posts'])
@@ -185,11 +213,13 @@ def delete_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Endpoint to delete a post by its ID"""
+    """Endpoint to delete a post by ID"""
     post_to_delete = db.query(models.Post).filter(
         models.Post.id == post_id,
-        models.Post.author == user.username
+        models.Post.author_id == user.id
     ).first()
+
+    # FIXME: do we also need to delete all reactions linked to the post?
 
     if post_to_delete:
         db.delete(post_to_delete)
@@ -200,78 +230,116 @@ def delete_post(
                         detail='Post not found or user is unauthorized')
 
 
-@app.post('/posts/{post_id}/like', tags=['Posts'])
+def handle_reaction(
+    is_add: bool,
+    is_positive: bool,
+    post_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Function to handle likes and dislikes"""
+    post = db.query(models.Post).get(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail='Post not found')
+
+    if post.author_id == user.id:
+        raise HTTPException(status_code=403,
+                            detail='Cannot like your own post')
+
+    reaction_type = 'Like' if is_positive else 'Dislike'
+
+    stored_reaction = db.query(models.PostReaction).filter(
+        models.PostReaction.post_id == post_id,
+        models.PostReaction.user_id == user.id
+    ).first()
+
+    if is_add:
+        if stored_reaction:
+            if stored_reaction.is_positive != is_positive:
+                # Update the existing reaction
+                stored_reaction.is_positive = is_positive
+                db.commit()
+                return {'message': f'Reaction updated to {reaction_type}'}
+            else:
+                return {'message': f'{reaction_type} already added'}
+        else:
+            new_reaction = models.PostReaction(
+                post_id=post_id,
+                user_id=user.id,
+                is_positive=is_positive
+            )
+            db.add(new_reaction)
+            db.commit()
+            return {'message': f'{reaction_type} added'}
+
+    else:  # is_remove
+        if not stored_reaction:
+            return {'message': f'{reaction_type} not found'}
+        if stored_reaction.is_positive == is_positive:
+            db.delete(stored_reaction)
+            db.commit()
+            return {'message': f'{reaction_type} removed'}
+        else:
+            return {'message': f'{reaction_type} already removed'}
+
+
+@app.post('/posts/{post_id}/like', tags=['Posts', 'Reactions'])
 def like_post(
     post_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Endpoint to like posts"""
-    post = db.query(models.Post).get(post_id)
-    if post:
-        if post.author != user.username:
-            reaction = db.query(models.PostReaction).filter(
-                models.PostReaction.post_id == post_id,
-                models.PostReaction.user_id == user.id
-            ).first()
-
-            if reaction:
-                post.likes -= 1
-                db.delete(reaction)
-                db.commit()
-                return {'message': 'Like removed'}
-            else:
-                post.likes += 1
-                new_reaction = models.PostReaction(
-                    post_id=post_id,
-                    user_id=user.id,
-                    reaction='like'
-                )
-                db.add(new_reaction)
-                db.commit()
-                return {'message': 'Post liked!'}
-        else:
-            raise HTTPException(status_code=403,
-                                detail='Cannot like your own post')
-    else:
-        raise HTTPException(status_code=404, detail='Post not found')
+    """Endpoint to add likes"""
+    return handle_reaction(
+        is_add=True,
+        is_positive=True,
+        post_id=post_id,
+        user=user, db=db
+    )
 
 
-@app.post('/posts/{post_id}/dislike', tags=['Posts'])
+@app.delete('/posts/{post_id}/like', tags=['Posts', 'Reactions'])
+def remove_like_for_post(
+    post_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Endpoint to remove likes"""
+    return handle_reaction(
+        is_add=False,
+        is_positive=True,
+        post_id=post_id,
+        user=user, db=db
+    )
+
+
+@app.post('/posts/{post_id}/dislike', tags=['Posts', 'Reactions'])
 def dislike_post(
     post_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Endpoint to dislike posts"""
-    post = db.query(models.Post).get(post_id)
-    if post:
-        if post.author != user.username:
-            reaction = db.query(models.PostReaction).filter(
-                models.PostReaction.post_id == post_id,
-                models.PostReaction.user_id == user.id
-            ).first()
+    """Endpoint to add dislikes"""
+    return handle_reaction(is_add=True,
+                           is_positive=False,
+                           post_id=post_id,
+                           user=user, db=db
+                           )
 
-            if reaction:
-                post.dislikes -= 1
-                db.delete(reaction)
-                db.commit()
-                return {'message': 'Dislike removed'}
-            else:
-                post.dislikes += 1
-                new_reaction = models.PostReaction(
-                    post_id=post_id,
-                    user_id=user.id,
-                    reaction='dislike'
-                )
-                db.add(new_reaction)
-                db.commit()
-                return {'message': 'Post disliked!'}
-        else:
-            raise HTTPException(status_code=403,
-                                detail='Cannot like your own post')
-    else:
-        raise HTTPException(status_code=404, detail='Post not found')
+
+@app.delete('/posts/{post_id}/dislike', tags=['Posts', 'Reactions'])
+def remove_dislike_for_post(
+    post_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Endpoint to remove dislikes"""
+    return handle_reaction(is_add=False,
+                           is_positive=False,
+                           post_id=post_id,
+                           user=user,
+                           db=db
+                           )
 
 
 # TODO: add redis cache for likes and dislikes

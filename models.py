@@ -1,7 +1,7 @@
 """Database models"""
 
 from database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 
@@ -9,28 +9,36 @@ class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
+
     username = Column(String)
     password = Column(String)
     email = Column(String)
 
+    posts = relationship('Post', back_populates='author')
+    reactions = relationship('PostReaction', back_populates='user')
+
 
 class Post(Base):
     __tablename__ = 'posts'
-
     id = Column(Integer, primary_key=True, index=True)
+
     title = Column(String)
     content = Column(String)
-    author = Column(String)
-    likes = Column(Integer, default=0)
-    dislikes = Column(Integer, default=0)
+
+    author_id = Column(Integer, ForeignKey("users.id"))
+    author = relationship('User', back_populates='posts')
+
+    reactions = relationship('PostReaction', back_populates='post')
 
 
 class PostReaction(Base):
     __tablename__ = 'reactions'
+    id = Column(Integer, primary_key=True, index=True)
 
-    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    reaction = Column(String)
+    is_positive = Column(Boolean)
 
-    user = relationship('User', backref='reactions')
-    post = relationship('Post', backref='reactions')
+    post_id = Column(Integer, ForeignKey("posts.id"))
+    post = relationship('Post', back_populates='reactions')
+
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship('User', back_populates='reactions')
