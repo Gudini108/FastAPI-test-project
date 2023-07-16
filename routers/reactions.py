@@ -66,7 +66,7 @@ def handle_reaction(
             return {'message': f'{reaction_type} already removed'}
 
 
-@router.post('/posts/{post_id}/like', tags=['Posts', 'Reactions'])
+@router.post('/posts/{post_id}/like', tags=['Reactions'])
 def like_post(
     post_id: int,
     user: User = Depends(get_current_user),
@@ -81,7 +81,7 @@ def like_post(
     )
 
 
-@router.delete('/posts/{post_id}/like', tags=['Posts', 'Reactions'])
+@router.delete('/posts/{post_id}/like', tags=['Reactions'])
 def remove_like_for_post(
     post_id: int,
     user: User = Depends(get_current_user),
@@ -96,7 +96,7 @@ def remove_like_for_post(
     )
 
 
-@router.post('/posts/{post_id}/dislike', tags=['Posts', 'Reactions'])
+@router.post('/posts/{post_id}/dislike', tags=['Reactions'])
 def dislike_post(
     post_id: int,
     user: User = Depends(get_current_user),
@@ -110,7 +110,7 @@ def dislike_post(
                            )
 
 
-@router.delete('/posts/{post_id}/dislike', tags=['Posts', 'Reactions'])
+@router.delete('/posts/{post_id}/dislike', tags=['Reactions'])
 def remove_dislike_for_post(
     post_id: int,
     user: User = Depends(get_current_user),
