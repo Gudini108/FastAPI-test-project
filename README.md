@@ -30,6 +30,7 @@ you would need Python, preferably latest version.
     pip install -r requirements.txt
     
 
+### Set up emailhunters.co API key
 #### Go to `settings.py`
 
 1. Find line `EMAILHUNTERS_API_KEY = os.getenv('EMAILHUNTER_API_KEY')`
