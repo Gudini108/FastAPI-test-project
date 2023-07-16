@@ -15,7 +15,7 @@ you would need Python, preferably latest version.
 
 #### for windows based systems:
     python -m venv venv
-    source/Scripts/activate
+    source venv/Scripts/activate
 
 
 #### upgrade pip:
