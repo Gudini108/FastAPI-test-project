@@ -7,6 +7,7 @@ you would need Python, preferably latest version.
 #### Clone this repo and move to project main directory:
     git clone https://github.com/Gudini108/FastAPI-test-project.git
 
+
 #### Create and activate virtual enviroment:
 #### for linux based systems:
     python3 -m venv venv
@@ -15,6 +16,7 @@ you would need Python, preferably latest version.
 #### for windows based systems:
     python -m venv venv
     source/Scripts/activate
+
 
 #### upgrade pip:
 #### for linux based systems:
