@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from fastapi import HTTPException, Depends
 
-import models
-from database import get_db
+import db.models as models
+from db.database import get_db
 from settings import (
     EHUNT_ENDPOINT_WEB,
     EHUNT_ENDPOINT_API,

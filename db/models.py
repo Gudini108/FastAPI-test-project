@@ -1,8 +1,8 @@
 """Database models"""
 
-from database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from db.database import Base
 from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
 
 
 class User(Base):
@@ -28,7 +28,8 @@ class Post(Base):
     author_id = Column(Integer, ForeignKey("users.id"))
     author = relationship('User', back_populates='posts')
 
-    reactions = relationship('PostReaction', back_populates='post')
+    reactions = relationship('PostReaction', cascade='all, delete',
+                             back_populates='post')
 
 
 class PostReaction(Base):
