@@ -45,7 +45,7 @@ you would need Python, preferably latest version.
 2. Write in it your emailhunters.co api key like this `EMAILHUNTERS_API_KEY = 'your_api_key'` where `'your_api_key'` is your emailhunters.co personal API key
 
 3. Save changes in this file
-4. 
+
 
 #### Lauch project with `uvicorn main:app --reload` command
 
