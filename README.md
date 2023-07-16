@@ -11,7 +11,7 @@ you would need Python, preferably latest version.
     python3 -m venv venv
     source venv/bin/activate
 
-#### windows based systems:
+#### for windows based systems:
     python -m venv venv
     source/Scripts/activate
 
