@@ -5,7 +5,7 @@
 you would need Python, preferably latest version.
 
 #### Clone this repo and move to project main directory:
-    git clone git@github.com:Gudini108/FastAPI-test-project.git
+    git clone https://github.com/Gudini108/FastAPI-test-project.git
 
 #### Create and activate virtual enviroment:
     python3 -m venv venv
