@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, Depends, APIRouter
 
 import db.models as models
-from base.models import User, PostCreate, PostUpdate
+from base.schemas import User, PostCreate, PostUpdate
 from db.database import get_db
 from utils import get_current_user
 

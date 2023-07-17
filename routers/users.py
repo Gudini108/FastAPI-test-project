@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import HTTPException, APIRouter, Depends
 
 import db.models as models
-from base.models import UserRegistration
+from base.schemas import UserRegistration
 from settings import ACCESS_TOKEN_EXPIRE_MINUTES
 from db.database import db_engine, get_db
 from utils import (

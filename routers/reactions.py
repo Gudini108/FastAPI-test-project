@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, Depends, APIRouter
 
 import db.models as models
-from base.models import User
+from base.schemas import User
 from db.database import get_db
 from utils import get_current_user
 
