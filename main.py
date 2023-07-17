@@ -1,4 +1,4 @@
-"""Routing and endpoints"""
+"""App description and launch"""
 
 from fastapi import FastAPI, APIRouter
 
