@@ -2,9 +2,10 @@
 
 from fastapi import FastAPI, APIRouter
 
-from routers.users import router as users_router
+from routers.auth import router as auth_router
 from routers.posts import router as posts_router
 from routers.reactions import router as reactions_router
+from routers.users import router as users_router
 
 
 API_DESCRIPTION = """
@@ -38,6 +39,7 @@ def root():
 
 api_prefx = '/api/v1'
 app.include_router(router, prefix=api_prefx)
+app.include_router(auth_router, prefix=api_prefx)
 app.include_router(users_router, prefix=api_prefx)
 app.include_router(posts_router, prefix=api_prefx)
 app.include_router(reactions_router, prefix=api_prefx)
